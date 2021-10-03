@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -151,7 +152,7 @@ type PrometheusTaskInfo struct {
 //                }
 //              ],
 //     ...
-func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
+func (t *AugmentedTask) ExporterInformation(svcec2 *ec2.Client) []*PrometheusTaskInfo {
 	ret := []*PrometheusTaskInfo{}
 	var host string
 	var ip string
@@ -259,6 +260,14 @@ func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
 				}
 			} else {
 				for _, ni := range i.NetworkInterfaces {
+					if *usePublicIp {
+						if ni, _ := DiscoverNetworkInterface(svcec2, ni.PrivateIpv4Address); ni != nil &&
+							ni.Association != nil && ni.Association.PublicIp != nil {
+							ip = *ni.Association.PublicIp
+						}
+						continue
+					}
+
 					if *ni.PrivateIpv4Address != "" {
 						ip = *ni.PrivateIpv4Address
 					}
@@ -314,6 +323,28 @@ func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
 		})
 	}
 	return ret
+}
+
+// DiscoverNetworkInterface discovers network interface filtered by the private-ip-address
+func DiscoverNetworkInterface(svc *ec2.Client, privateIp *string) (*ec2types.NetworkInterface, error) {
+
+	out, err := svc.DescribeNetworkInterfaces(context.Background(), &ec2.DescribeNetworkInterfacesInput{
+		Filters: []ec2types.Filter{
+			{Name: aws.String("private-ip-address"), Values: []string{*privateIp}},
+		},
+	})
+
+	if err != nil {
+		log.Printf("Error describing network interface: %s", err)
+		return nil, err
+	}
+
+	if len(out.NetworkInterfaces) == 0 {
+		return nil, nil
+	}
+
+	ni := out.NetworkInterfaces[0]
+	return &ni, nil
 }
 
 // AddTaskDefinitionsOfTasks adds to each Task the TaskDefinition
@@ -665,7 +696,7 @@ func main() {
 		}
 		infos := []*PrometheusTaskInfo{}
 		for _, t := range tasks {
-			info := t.ExporterInformation()
+			info := t.ExporterInformation(svcec2)
 			infos = append(infos, info...)
 		}
 		m, err := yaml.Marshal(infos)
