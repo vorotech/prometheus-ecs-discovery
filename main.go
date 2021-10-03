@@ -58,9 +58,10 @@ var outFile = flag.String("config.write-to", "ecs_file_sd.yml", "path of file to
 var interval = flag.Duration("config.scrape-interval", 60*time.Second, "interval at which to scrape the AWS API for ECS service discovery information")
 var times = flag.Int("config.scrape-times", 0, "how many times to scrape before exiting (0 = infinite)")
 var roleArn = flag.String("config.role-arn", "", "ARN of the role to assume when scraping the AWS API (optional)")
+var usePublicIp = flag.Bool("config.use-public-ip", false, "If true, the Public IP address of the Network Interface (ENI) will be used; otherwise Private IP address")
 var prometheusPortLabel = flag.String("config.port-label", "PROMETHEUS_EXPORTER_PORT", "Docker label to define the scrape port of the application (if missing an application won't be scraped)")
 var prometheusPathLabel = flag.String("config.path-label", "PROMETHEUS_EXPORTER_PATH", "Docker label to define the scrape path of the application")
-var prometheusSchemeLabel= flag.String("config.scheme-label", "PROMETHEUS_EXPORTER_SCHEME", "Docker label to define the scheme of the target application")
+var prometheusSchemeLabel = flag.String("config.scheme-label", "PROMETHEUS_EXPORTER_SCHEME", "Docker label to define the scheme of the target application")
 var prometheusFilterLabel = flag.String("config.filter-label", "", "Docker label (and optionally value) to require to scrape the application")
 var prometheusServerNameLabel = flag.String("config.server-name-label", "PROMETHEUS_EXPORTER_SERVER_NAME", "Docker label to define the server name")
 var prometheusJobNameLabel = flag.String("config.job-name-label", "PROMETHEUS_EXPORTER_JOB_NAME", "Docker label to define the job name")
@@ -164,6 +165,13 @@ func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
 		}
 
 		for _, iface := range t.EC2Instance.NetworkInterfaces {
+			if *usePublicIp && iface.Association != nil &&
+				iface.Association.PublicIp != nil && *iface.Association.PublicIp != "" &&
+				iface.Association.PublicDnsName != nil && *iface.Association.PublicDnsName != "" &&
+				*iface.Association.PublicDnsName == *t.EC2Instance.PublicDnsName {
+				ip = *iface.Association.PublicIp
+				break
+			}
 			if iface.PrivateIpAddress != nil && *iface.PrivateIpAddress != "" &&
 				iface.PrivateDnsName != nil && *iface.PrivateDnsName != "" &&
 				*iface.PrivateDnsName == *t.EC2Instance.PrivateDnsName {
@@ -297,7 +305,7 @@ func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
 
 		scheme, ok = d.DockerLabels[*prometheusSchemeLabel]
 		if ok {
-		    labels.Scheme = scheme
+			labels.Scheme = scheme
 		}
 
 		ret = append(ret, &PrometheusTaskInfo{
