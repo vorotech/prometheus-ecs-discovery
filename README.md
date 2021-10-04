@@ -29,7 +29,8 @@ The command line parameters that can be used are:
 * -config.filter-label (string): docker label (and optional value) to filter on "NAME_OF_LABEL[=VALUE]".
 * -config.port-label (string): Docker label to define the scrape port of the application
   (if missing an application won't be scraped) (default "PROMETHEUS_EXPORTER_PORT")
-* -config.use-public-ip (bool): Docker label to define whether to use PublicIP of the Network Interface
+* -config.use-public-ip: Docker label to define whether to use PublicIP of the Network Interface
+  (default private IP address)
 
 ## Usage
 
