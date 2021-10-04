@@ -44,7 +44,7 @@ Then, run it as follows:
   `AWS_SECRET_ACCESS_KEY` into the environment of the program,
   making sure that the keys have access to the EC2 / ECS APIs
   (IAM policies should include `ECS:ListClusters`,
-  `ECS:ListTasks`, `ECS:DescribeTask`, `EC2:DescribeInstances`,
+  `ECS:ListTasks`, `EC2:DescribeInstances`,
   `ECS:DescribeContainerInstances`, `ECS:DescribeTasks`,
   `ECS:DescribeTaskDefinition`, `ECS:DescribeClusters`). If the program needs to assume
   a different role to obtain access, this role's ARN may be
